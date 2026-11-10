@@ -1,0 +1,8 @@
+config main 'main'
+	option interface 'br-lan'
+	option probe_interval '30'
+	option scan_wait '5'
+	option online_window '60'
+	option cache_ttl '300'
+	option max_entries '4096'
+	option oui_file '/etc/ipc-discovery/oui-camera.txt'

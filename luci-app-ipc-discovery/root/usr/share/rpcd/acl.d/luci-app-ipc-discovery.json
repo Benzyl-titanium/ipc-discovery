@@ -1,0 +1,15 @@
+{
+	"luci-app-ipc-discovery": {
+		"description": "Run local IP camera discovery",
+		"read": {
+			"ubus": {
+				"luci.ipc-discovery": [ "status", "daemon_status" ]
+			}
+		},
+		"write": {
+			"ubus": {
+				"luci.ipc-discovery": [ "scan", "clear_cache", "daemon_start", "daemon_stop" ]
+			}
+		}
+	}
+}

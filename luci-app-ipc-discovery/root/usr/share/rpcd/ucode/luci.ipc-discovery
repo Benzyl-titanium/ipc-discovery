@@ -1,0 +1,101 @@
+#!/usr/bin/ucode
+
+'use strict';
+
+import { access, popen } from 'fs';
+
+const scanner = '/usr/bin/ipc-discovery';
+const initScript = '/etc/init.d/ipc-discovery';
+
+function execute(command) {
+	const fd = popen(command);
+	if (!fd)
+		return { code: 127, output: '执行失败：' + command };
+	const output = fd.read('all') || '';
+	const code = fd.close();
+	return { code, output };
+}
+
+function daemonStatus() {
+	if (!access(initScript, 'x')) {
+		return {
+			ok: false,
+			running: false,
+			enabled: false,
+			error: '发现服务脚本未安装：' + initScript
+		};
+	}
+
+	const running = execute(initScript + ' running');
+	const enabled = execute(initScript + ' enabled');
+	return {
+		ok: true,
+		running: running.code == 0,
+		enabled: enabled.code == 0
+	};
+}
+
+function setDaemon(enable) {
+	if (!access(initScript, 'x'))
+		return daemonStatus();
+
+	const first = execute(initScript + (enable ? ' enable' : ' stop'));
+	const second = execute(initScript + (enable ? ' start' : ' disable'));
+	const status = daemonStatus();
+	if (first.code != 0 || second.code != 0) {
+		status.ok = false;
+		status.error = first.output || second.output || '发现服务操作失败';
+	}
+	else if (status.running != enable || status.enabled != enable) {
+		status.ok = false;
+		status.error = '发现服务未达到请求状态';
+	}
+	return status;
+}
+
+function invoke(command) {
+	if (!access(scanner, 'x')) {
+		return {
+			code: 127,
+			stdout: '',
+			stderr: '扫描器未安装或不可执行：' + scanner
+		};
+	}
+
+	/* command is selected only by the fixed method definitions below. */
+	const fd = popen(scanner + ' --client ' + command + ' --json');
+	if (!fd) {
+		return {
+			code: 127,
+			stdout: '',
+			stderr: '启动扫描客户端失败'
+		};
+	}
+
+	const stdout = fd.read('all') || '';
+	const code = fd.close();
+	return { code, stdout, stderr: '' };
+}
+
+const methods = {
+	status: {
+		call: function() { return invoke('status'); }
+	},
+	scan: {
+		call: function() { return invoke('scan'); }
+	},
+	clear_cache: {
+		call: function() { return invoke('clear'); }
+	},
+	daemon_status: {
+		call: function() { return daemonStatus(); }
+	},
+	daemon_start: {
+		call: function() { return setDaemon(true); }
+	},
+	daemon_stop: {
+		call: function() { return setDaemon(false); }
+	}
+};
+
+return { 'luci.ipc-discovery': methods };
